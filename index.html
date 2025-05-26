@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tasktify</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6 font-sans">
+
+  <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-6">
+    <h1 class="text-2xl font-bold mb-4 text-center text-indigo-600">Tasktify</h1>
+
+    <form class="new-task-form flex gap-2 mb-4">
+      <input
+        type="text"
+        required
+        class="new-task flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        placeholder="Enter a new task..." />
+      <button
+        type="submit"
+        class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+        Add
+      </button>
+    </form>
+
+    <ol id="Task" class="space-y-2"></ol>
+  </div>
+
+  <script>
+    $(document).ready(function () {
+      const firebaseConfig = {
+        apiKey: "AIzaSyDONsCD2ylgOMLz2gmZ0dEz2C4IdeF0wKA",
+        authDomain: "tasktify-1cb16.firebaseapp.com",
+        projectId: "tasktify-1cb16",
+        storageBucket: "tasktify-1cb16.appspot.com",
+        messagingSenderId: "759089908374",
+        appId: "1:759089908374:web:cf8a405e6ceb129b6090b7",
+        measurementId: "G-50NJYVKLB7"
+      };
+
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.firestore();
+
+      function renderTask(id, todo, done) {
+        const taskHTML = `
+          <li data-key="${id}" class="flex justify-between items-center bg-gray-50 px-4 py-2 rounded shadow-sm">
+            <span class="${done ? 'line-through text-gray-400' : 'font-semibold'}">${todo}</span>
+            <div class="flex gap-2">
+              <button doc-id="${id}" class="done px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600">Done</button>
+              <button doc-id="${id}" class="delete px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600">Delete</button>
+            </div>
+          </li>`;
+        return taskHTML;
+      }
+
+      db.collection("Task").onSnapshot((snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          const data = change.doc.data();
+          const id = change.doc.id;
+          const html = renderTask(id, data.todo, data.done);
+
+          if (change.type === "added") {
+            $("#Task").append(html);
+          }
+          if (change.type === "modified") {
+            $(`li[data-key='${id}']`).replaceWith(html);
+          }
+          if (change.type === "removed") {
+            $(`li[data-key='${id}']`).remove();
+          }
+        });
+      });
+
+      $(".new-task-form").submit(function (e) {
+        e.preventDefault();
+        const newTask = $(".new-task").val();
+        if (newTask.trim()) {
+          db.collection("Task").add({ todo: newTask, done: false });
+          $(".new-task").val("");
+        }
+      });
+
+      $(document).on('click', '.done', function () {
+        const id = $(this).attr("doc-id");
+        db.collection("Task").doc(id).update({ done: true });
+      });
+
+      $(document).on('click', '.delete', function () {
+        const id = $(this).attr("doc-id");
+        db.collection("Task").doc(id).delete();
+      });
+    });
+  </script>
+</body>
+</html>
