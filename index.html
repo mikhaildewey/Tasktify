@@ -1,99 +1,493 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tasktify</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-</head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6 font-sans">
-
-  <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-6">
-    <h1 class="text-2xl font-bold mb-4 text-center text-indigo-600">Tasktify</h1>
-
-    <form class="new-task-form flex gap-2 mb-4">
-      <input
-        type="text"
-        required
-        class="new-task flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
-        placeholder="Enter a new task..." />
-      <button
-        type="submit"
-        class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
-        New Task
-      </button>
-    </form>
-
-    <ol id="Task" class="space-y-2"></ol>
-  </div>
-
-  <script>
-    $(document).ready(function () {
-      const firebaseConfig = {
-        apiKey: "AIzaSyDONsCD2ylgOMLz2gmZ0dEz2C4IdeF0wKA",
-        authDomain: "tasktify-1cb16.firebaseapp.com",
-        projectId: "tasktify-1cb16",
-        storageBucket: "tasktify-1cb16.appspot.com",
-        messagingSenderId: "759089908374",
-        appId: "1:759089908374:web:cf8a405e6ceb129b6090b7",
-        measurementId: "G-50NJYVKLB7"
-      };
-
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.firestore();
-
-      function renderTask(id, todo, done) {
-        const taskHTML = `
-          <li data-key="${id}" class="flex justify-between items-center bg-gray-50 px-4 py-2 rounded shadow-sm">
-            <span class="${done ? 'line-through text-gray-400' : 'font-semibold'}">${todo}</span>
-            <div class="flex gap-2">
-              <button doc-id="${id}" class="done px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600">Done</button>
-              <button doc-id="${id}" class="delete px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600">Delete</button>
-            </div>
-          </li>`;
-        return taskHTML;
-      }
-
-      db.collection("Task").onSnapshot((snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          const data = change.doc.data();
-          const id = change.doc.id;
-          const html = renderTask(id, data.todo, data.done);
-
-          if (change.type === "added") {
-            $("#Task").append(html);
-          }
-          if (change.type === "modified") {
-            $(`li[data-key='${id}']`).replaceWith(html);
-          }
-          if (change.type === "removed") {
-            $(`li[data-key='${id}']`).remove();
-          }
-        });
-      });
-
-      $(".new-task-form").submit(function (e) {
-        e.preventDefault();
-        const newTask = $(".new-task").val();
-        if (newTask.trim()) {
-          db.collection("Task").add({ todo: newTask, done: false });
-          $(".new-task").val("");
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tasktify - Your Customizable To-Do List</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: var(--font-family);
+            background: var(--primary-bg); /* Use CSS variable for primary background */
+            transition: background 0.5s ease; /* Smooth transition for background gradient */
         }
-      });
 
-      $(document).on('click', '.done', function () {
-        const id = $(this).attr("doc-id");
-        db.collection("Task").doc(id).update({ done: true });
-      });
+        /* Define CSS Variables on the root element */
+        :root {
+            /* Colors */
+            --primary-bg: linear-gradient(to right, #8b5cf6, #4f46e5); /* purple-500 to indigo-600 */
+            --secondary-bg: #ffffff; /* white */
+            --text-primary: #1f2937; /* gray-800 */
+            --text-secondary: #6b7280; /* gray-500 */
+            --header-text: #4338ca; /* indigo-700 */
+            --input-border: #d1d5db; /* gray-300 */
+            --input-focus-ring: #a5b4fc; /* indigo-300 */
+            --button-primary-bg: #4f46e5; /* indigo-600 */
+            --button-primary-hover-bg: #4338ca; /* indigo-700 */
+            --task-item-bg: #ffffff; /* white */
+            --task-item-border: #e5e7eb; /* gray-200 */
+            --task-text-done: #9ca3af; /* gray-400 */ /* For line-through */
+            --timestamp-text: #9ca3af; /* gray-400 */
+            --button-done-bg: #22c55e; /* green-500 */
+            --button-done-hover-bg: #16a34a; /* green-600 */
+            --button-undone-bg: #f59e0b; /* yellow-500 */
+            --button-undone-hover-bg: #d97706; /* yellow-600 */
+            --button-edit-bg: #3b82f6; /* blue-500 */
+            --button-edit-hover-bg: #2563eb; /* blue-600 */
+            --button-delete-bg: #ef4444; /* red-500 */
+            --button-delete-hover-bg: #dc2626; /* red-600 */
+            --button-save-bg: #2563eb; /* blue-600 */
+            --button-save-hover-bg: #1d4ed8; /* blue-700 */
+            --button-cancel-bg: #9ca3af; /* gray-400 */
+            --button-cancel-hover-bg: #6b7280; /* gray-500 */
 
-      $(document).on('click', '.delete', function () {
-        const id = $(this).attr("doc-id");
-        db.collection("Task").doc(id).delete();
-      });
-    });
-  </script>
+            /* Fonts & Other - set these initially, can be changed via JS if theme includes font changes */
+            --font-family: 'Poppins', sans-serif;
+            --border-radius-main: 1rem; /* rounded-2xl */
+            --border-radius-elements: 0.75rem; /* rounded-xl */
+            --shadow-main: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-xl */
+            --shadow-item: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+        }
+
+        /* Apply variables to Tailwind classes */
+        .main-container {
+            background-color: var(--secondary-bg);
+            border-radius: var(--border-radius-main);
+            box-shadow: var(--shadow-main);
+            color: var(--text-primary); /* Default text color for the container */
+        }
+        .header-text {
+            color: var(--header-text);
+        }
+        .input-field {
+            border-color: var(--input-border);
+            color: var(--text-primary);
+            background-color: var(--secondary-bg); /* Input background matching container */
+        }
+        .input-field::placeholder {
+            color: var(--text-secondary);
+        }
+        .input-field:focus {
+            outline: none;
+            box-shadow: 0 0 0 4px var(--input-focus-ring);
+        }
+        .button-primary {
+            background-color: var(--button-primary-bg);
+            color: white;
+        }
+        .button-primary:hover {
+            background-color: var(--button-primary-hover-bg);
+        }
+        .task-item {
+            background-color: var(--task-item-bg);
+            border-color: var(--task-item-border);
+            box-shadow: var(--shadow-item);
+            border-radius: var(--border-radius-elements);
+        }
+        .task-text {
+            color: var(--text-primary);
+        }
+        .task-text.line-through {
+            color: var(--task-text-done);
+        }
+        .timestamp-text {
+            color: var(--timestamp-text);
+        }
+        .button-done {
+            background-color: var(--button-done-bg);
+            color: white;
+        }
+        .button-done:hover {
+            background-color: var(--button-done-hover-bg);
+        }
+        .button-undone {
+            background-color: var(--button-undone-bg);
+            color: white;
+        }
+        .button-undone:hover {
+            background-color: var(--button-undone-hover-bg);
+        }
+        .button-edit {
+            background-color: var(--button-edit-bg);
+            color: white;
+        }
+        .button-edit:hover {
+            background-color: var(--button-edit-hover-bg);
+        }
+        .button-delete {
+            background-color: var(--button-delete-bg);
+            color: white;
+        }
+        .button-delete:hover {
+            background-color: var(--button-delete-hover-bg);
+        }
+        .button-save {
+            background-color: var(--button-save-bg);
+            color: white;
+        }
+        .button-save:hover {
+            background-color: var(--button-save-hover-bg);
+        }
+        .button-cancel {
+            background-color: var(--button-cancel-bg);
+            color: white;
+        }
+        .button-cancel:hover {
+            background-color: var(--button-cancel-hover-bg);
+        }
+        .theme-selector-wrapper .theme-selector { /* Targeting the select within the wrapper */
+            background-color: var(--task-item-bg); /* Use secondary bg for selector */
+            color: var(--text-primary);
+        }
+        .theme-selector-wrapper .theme-selector:focus {
+             outline: none;
+            box-shadow: 0 0 0 2px var(--input-focus-ring);
+        }
+         /* To center the title when theme selector is present */
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between; /* Pushes items to ends */
+            width: 100%; /* Ensure it takes full width */
+            margin-bottom: 1.5rem; /* Equivalent to mb-6 */
+        }
+        .header-content h1 {
+            flex-grow: 1; /* Allow title to take available space */
+            text-align: center; /* Center the text within its flex item */
+            margin-left: auto; /* Push title to center from left */
+            margin-right: auto; /* Push title to center from right */
+            max-width: fit-content; /* Prevent it from taking too much space */
+        }
+
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-6">
+
+    <div class="w-full max-w-lg main-container rounded-2xl shadow-xl p-8 transform transition-all duration-300 hover:scale-105 relative">
+        <div class="header-content">
+            <h1 class="text-4xl font-extrabold header-text tracking-tight">Tasktify</h1>
+            <div class="flex items-center gap-2 theme-selector-wrapper">
+                <label for="theme-selector" class="text-sm theme-selector-label" style="color: var(--text-primary);">Theme:</label>
+                <select id="theme-selector" class="p-2 rounded-md theme-selector focus:ring-2 focus:ring-indigo-400">
+                    <option value="default">Default (Light)</option>
+                    <option value="dark">Dark Mode</option>
+                    <option value="ocean">Ocean Blue</option>
+                    <option value="forest">Forest Green</option>
+                </select>
+            </div>
+        </div>
+        <form class="new-task-form flex gap-3 mb-6">
+            <input
+                type="text"
+                required
+                class="new-task flex-1 px-5 py-3 border rounded-xl text-lg placeholder-gray-400 input-field"
+                placeholder="What's your next task?" />
+            <button
+                type="submit"
+                class="button-primary px-6 py-3 rounded-xl hover:bg-indigo-700 transition duration-300 ease-in-out shadow-lg text-lg">
+                Add Task
+            </button>
+        </form>
+
+        <ol id="Task" class="space-y-4"></ol>
+    </div>
+
+    <script>
+        $(document).ready(function () {
+            // Firebase Configuration
+            const firebaseConfig = {
+                apiKey: "AIzaSyDONsCD2ylgOMLz2gmZ0dEz2C4IdeF0wKA",
+                authDomain: "tasktify-1cb16.firebaseapp.com",
+                projectId: "tasktify-1cb16",
+                storageBucket: "tasktify-1cb16.appspot.com",
+                messagingSenderId: "759089908374",
+                appId: "1:759089908374:web:cf8a405e6ceb129b6090b7",
+                measurementId: "G-50NJYVKLB7"
+            };
+
+            firebase.initializeApp(firebaseConfig);
+            const db = firebase.firestore();
+
+            // --- Theme Switching Logic ---
+            const themeSelector = $('#theme-selector');
+            const root = document.documentElement; // Get the :root element
+
+            const themes = {
+                'default': { // Light Theme (similar to current)
+                    '--primary-bg': 'linear-gradient(to right, #8b5cf6, #4f46e5)',
+                    '--secondary-bg': '#ffffff',
+                    '--text-primary': '#1f2937',
+                    '--text-secondary': '#6b7280',
+                    '--header-text': '#4338ca',
+                    '--input-border': '#d1d5db',
+                    '--input-focus-ring': '#a5b4fc',
+                    '--button-primary-bg': '#4f46e5',
+                    '--button-primary-hover-bg': '#4338ca',
+                    '--task-item-bg': '#ffffff',
+                    '--task-item-border': '#e5e7eb',
+                    '--task-text-done': '#9ca3af',
+                    '--timestamp-text': '#9ca3af',
+                    '--button-done-bg': '#22c55e',
+                    '--button-done-hover-bg': '#16a34a',
+                    '--button-undone-bg': '#f59e0b',
+                    '--button-undone-hover-bg': '#d97706',
+                    '--button-edit-bg': '#3b82f6',
+                    '--button-edit-hover-bg': '#2563eb',
+                    '--button-delete-bg': '#ef4444',
+                    '--button-delete-hover-bg': '#dc2626',
+                    '--button-save-bg': '#2563eb',
+                    '--button-save-hover-bg': '#1d4ed8',
+                    '--button-cancel-bg': '#9ca3af',
+                    '--button-cancel-hover-bg': '#6b7280',
+                },
+                'dark': {
+                    '--primary-bg': '#1a202c', /* charcoal */
+                    '--secondary-bg': '#2d3748', /* darker gray */
+                    '--text-primary': '#e2e8f0', /* light gray */
+                    '--text-secondary': '#a0aec0', /* lighter gray */
+                    '--header-text': '#9f7aea', /* lighter purple */
+                    '--input-border': '#4a5568',
+                    '--input-focus-ring': '#6b46c1', /* darker purple */
+                    '--button-primary-bg': '#6b46c1',
+                    '--button-primary-hover-bg': '#553c9a',
+                    '--task-item-bg': '#2d3748',
+                    '--task-item-border': '#4a5568',
+                    '--task-text-done': '#a0aec0',
+                    '--timestamp-text': '#a0aec0',
+                    '--button-done-bg': '#38a169', /* darker green */
+                    '--button-done-hover-bg': '#2f855a',
+                    '--button-undone-bg': '#d69e2e', /* darker yellow */
+                    '--button-undone-hover-bg': '#b7791f',
+                    '--button-edit-bg': '#4299e1', /* darker blue */
+                    '--button-edit-hover-bg': '#3182ce',
+                    '--button-delete-bg': '#e53e3e', /* darker red */
+                    '--button-delete-hover-bg': '#c53030',
+                    '--button-save-bg': '#3182ce',
+                    '--button-save-hover-bg': '#2b6cb0',
+                    '--button-cancel-bg': '#4a5568',
+                    '--button-cancel-hover-bg': '#2d3748',
+                },
+                'ocean': {
+                    '--primary-bg': 'linear-gradient(to right, #6366f1, #3b82f6)', /* indigo-500 to blue-500 */
+                    '--secondary-bg': '#e0f2fe', /* light blue */
+                    '--text-primary': '#1e3a8a', /* dark blue */
+                    '--text-secondary': '#4a679e',
+                    '--header-text': '#1e3a8a',
+                    '--input-border': '#93c5fd', /* blue-300 */
+                    '--input-focus-ring': '#a5b4fc',
+                    '--button-primary-bg': '#2563eb', /* blue-600 */
+                    '--button-primary-hover-bg': '#1e40af', /* blue-800 */
+                    '--task-item-bg': '#eff6ff', /* lighter blue */
+                    '--task-item-border': '#bfdbfe', /* blue-200 */
+                    '--task-text-done': '#60a5fa', /* blue-400 */
+                    '--timestamp-text': '#60a5fa',
+                    '--button-done-bg': '#34d399', /* teal */
+                    '--button-done-hover-bg': '#10b981',
+                    '--button-undone-bg': '#fbbf24', /* amber */
+                    '--button-undone-hover-bg': '#f59e0b',
+                    '--button-edit-bg': '#3b82f6',
+                    '--button-edit-hover-bg': '#2563eb',
+                    '--button-delete-bg': '#ef4444',
+                    '--button-delete-hover-bg': '#dc2626',
+                    '--button-save-bg': '#2563eb',
+                    '--button-save-hover-bg': '#1d4ed8',
+                    '--button-cancel-bg': '#93c5fd',
+                    '--button-cancel-hover-bg': '#60a5fa',
+                },
+                'forest': {
+                    '--primary-bg': 'linear-gradient(to right, #10b981, #059669)', /* emerald-500 to green-600 */
+                    '--secondary-bg': '#f0fdf4', /* light green */
+                    '--text-primary': '#1f2937', /* dark gray */
+                    '--text-secondary': '#4b5563', /* gray */
+                    '--header-text': '#047857', /* dark green */
+                    '--input-border': '#a7f3d0', /* emerald-200 */
+                    '--input-focus-ring': '#6ee7b7', /* emerald-300 */
+                    '--button-primary-bg': '#059669', /* green-600 */
+                    '--button-primary-hover-bg': '#047857', /* green-700 */
+                    '--task-item-bg': '#d1fae5', /* very light green */
+                    '--task-item-border': '#6ee7b7', /* emerald-300 */
+                    '--task-text-done': '#34d399', /* emerald-500 */
+                    '--timestamp-text': '#34d399',
+                    '--button-done-bg': '#22c55e',
+                    '--button-done-hover-bg': '#16a34a',
+                    '--button-undone-bg': '#fbbf24',
+                    '--button-undone-hover-bg': '#f59e0b',
+                    '--button-edit-bg': '#4ade80', /* lime-400 */
+                    '--button-edit-hover-bg': '#22c55e',
+                    '--button-delete-bg': '#ef4444',
+                    '--button-delete-hover-bg': '#dc2626',
+                    '--button-save-bg': '#059669',
+                    '--button-save-hover-bg': '#047857',
+                    '--button-cancel-bg': '#a7f3d0',
+                    '--button-cancel-hover-bg': '#6ee7b7',
+                }
+            };
+
+            function applyTheme(themeName) {
+                const selectedTheme = themes[themeName];
+                for (const property in selectedTheme) {
+                    root.style.setProperty(property, selectedTheme[property]);
+                }
+                localStorage.setItem('chosenTheme', themeName);
+            }
+
+            // Load saved theme or set default on page load
+            const savedTheme = localStorage.getItem('chosenTheme');
+            if (savedTheme && themes[savedTheme]) {
+                applyTheme(savedTheme);
+                themeSelector.val(savedTheme); // Set dropdown to current theme
+            } else {
+                applyTheme('default'); // Fallback to default theme
+                themeSelector.val('default');
+            }
+
+            // Event listener for theme selector
+            themeSelector.on('change', function() {
+                applyTheme($(this).val());
+            });
+
+            // --- End Theme Switching Logic ---
+
+            // Function to render a task
+            function renderTask(id, todo, done, timestamp) {
+                const date = timestamp ? new Date(timestamp.toDate()).toLocaleString() : 'No date';
+                const taskHTML = `
+                    <li data-key="${id}" class="task-item flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 py-4 transition-all duration-200 ease-in-out hover:shadow-lg">
+                        <div class="flex-1 mb-2 sm:mb-0 mr-0 sm:mr-4">
+                            <span class="task-text ${done ? 'line-through' : 'font-semibold text-lg'}">${todo}</span>
+                            <p class="text-sm mt-1 timestamp-text">Created: ${date}</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2 justify-end">
+                            ${done ?
+                                `<button doc-id="${id}" class="undone-task px-4 py-2 rounded-lg transition text-sm button-undone">Undone</button>` :
+                                `<button doc-id="${id}" class="done-task px-4 py-2 rounded-lg transition text-sm button-done">Done</button>`
+                            }
+                            <button doc-id="${id}" class="edit-task px-4 py-2 rounded-lg transition text-sm button-edit">Edit</button>
+                            <button doc-id="${id}" class="delete-task px-4 py-2 rounded-lg transition text-sm button-delete">Delete</button>
+                        </div>
+                    </li>`;
+                return taskHTML;
+            }
+
+            // Realtime listener for tasks
+            db.collection("Task").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    const data = change.doc.data();
+                    const id = change.doc.id;
+                    const html = renderTask(id, data.todo, data.done, data.timestamp);
+
+                    if (change.type === "added") {
+                        $("#Task").prepend(html); // Prepend to show newest first
+                    }
+                    if (change.type === "modified") {
+                        $(`li[data-key='${id}']`).replaceWith(html);
+                    }
+                    if (change.type === "removed") {
+                        $(`li[data-key='${id}']`).remove();
+                    }
+                });
+            });
+
+            // Add new task
+            $(".new-task-form").submit(function (e) {
+                e.preventDefault();
+                const newTask = $(".new-task").val().trim();
+                if (newTask) {
+                    db.collection("Task").add({
+                        todo: newTask,
+                        done: false,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp() // Add timestamp
+                    });
+                    $(".new-task").val(""); // Clear input
+                }
+            });
+
+            // Mark task as done
+            $(document).on('click', '.done-task', function () {
+                const id = $(this).attr("doc-id");
+                db.collection("Task").doc(id).update({ done: true });
+            });
+
+            // Mark task as undone
+            $(document).on('click', '.undone-task', function () {
+                const id = $(this).attr("doc-id");
+                db.collection("Task").doc(id).update({ done: false });
+            });
+
+            // Edit task
+            $(document).on('click', '.edit-task', function () {
+                const listItem = $(this).closest('.task-item');
+                const id = listItem.data('key');
+                const currentTextElement = listItem.find('.task-text');
+                const currentText = currentTextElement.text();
+
+                // Store current task data in the DOM (e.g., using .data()) before replacing
+                listItem.data('original-todo', currentText);
+                listItem.data('original-done', currentTextElement.hasClass('line-through'));
+
+                // Replace text with input field, apply input-field classes
+                currentTextElement.replaceWith(`
+                    <input type="text" class="edit-input flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 input-field" value="${currentText}" />
+                `);
+
+                // Change buttons to Save and Cancel, apply respective button classes
+                listItem.find('.flex-wrap').html(`
+                    <button doc-id="${id}" class="save-edit px-4 py-2 rounded-lg transition text-sm button-save">Save</button>
+                    <button doc-id="${id}" class="cancel-edit px-4 py-2 rounded-lg transition text-sm button-cancel">Cancel</button>
+                `);
+            });
+
+            // Save edited task
+            $(document).on('click', '.save-edit', function () {
+                const listItem = $(this).closest('.task-item');
+                const id = $(this).attr("doc-id");
+                const newText = listItem.find('.edit-input').val().trim();
+
+                if (newText) {
+                    db.collection("Task").doc(id).update({ todo: newText });
+                }
+                // The Firestore snapshot listener will handle re-rendering once the update is successful.
+                // If newText is empty, the listener will still trigger with original value, so no need for explicit revert here.
+            });
+
+            // Cancel edit
+            $(document).on('click', '.cancel-edit', async function () {
+                const listItem = $(this).closest('.task-item');
+                const id = $(this).attr("doc-id");
+
+                // Retrieve the current data from Firestore to ensure it's up-to-date,
+                // or use the data stored in the DOM if available (less reliable if another user changed it).
+                try {
+                    const doc = await db.collection("Task").doc(id).get();
+                    if (doc.exists) {
+                        const data = doc.data();
+                        const html = renderTask(id, data.todo, data.done, data.timestamp);
+                        listItem.replaceWith(html); // Revert the UI to original state
+                    }
+                } catch (error) {
+                    console.error("Error fetching document to cancel edit:", error);
+                    // Fallback: If Firestore fetch fails, try to use the locally stored original data
+                    const originalTodo = listItem.data('original-todo');
+                    const originalDone = listItem.data('original-done');
+                    // Note: Timestamp won't be available from data() here easily, but the task content will revert.
+                    if (originalTodo !== undefined && originalDone !== undefined) {
+                         const tempHtml = renderTask(id, originalTodo, originalDone, null); // Pass null for timestamp if not easily available
+                         listItem.replaceWith(tempHtml);
+                    }
+                }
+            });
+
+
+            // Delete task
+            $(document).on('click', '.delete-task', function () {
+                const id = $(this).attr("doc-id");
+                db.collection("Task").doc(id).delete();
+            });
+        });
+    </script>
 </body>
 </html>
