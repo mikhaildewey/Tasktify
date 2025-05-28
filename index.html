@@ -8,6 +8,7 @@
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -40,17 +41,13 @@
             --button-edit-hover-bg: #2563eb; /* blue-600 */
             --button-delete-bg: #ef4444; /* red-500 */
             --button-delete-hover-bg: #dc2626; /* red-600 */
-            --button-save-bg: #2563eb; /* blue-600 */
-            --button-save-hover-bg: #1d4ed8; /* blue-700 */
-            --button-cancel-bg: #9ca3af; /* gray-400 */
-            --button-cancel-hover-bg: #6b7280; /* gray-500 */
-
-            /* Fonts & Other - set these initially, can be changed via JS if theme includes font changes */
-            --font-family: 'Poppins', sans-serif;
-            --border-radius-main: 1rem; /* rounded-2xl */
-            --border-radius-elements: 0.75rem; /* rounded-xl */
-            --shadow-main: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-xl */
-            --shadow-item: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+            --button-save-bg: #2563eb;
+            --button-save-hover-bg: #1d4ed8;
+            --button-cancel-bg: #9ca3af;
+            --button-cancel-hover-bg: #6b7280;
+            --error-text-color: #ef4444;
+            --google-button-bg: #db4437;
+            --google-button-hover-bg: #c13122;
         }
 
         /* Apply variables to Tailwind classes */
@@ -58,7 +55,7 @@
             background-color: var(--secondary-bg);
             border-radius: var(--border-radius-main);
             box-shadow: var(--shadow-main);
-            color: var(--text-primary); /* Default text color for the container */
+            color: var(--text-primary);
         }
         .header-text {
             color: var(--header-text);
@@ -66,7 +63,7 @@
         .input-field {
             border-color: var(--input-border);
             color: var(--text-primary);
-            background-color: var(--secondary-bg); /* Input background matching container */
+            background-color: var(--secondary-bg);
         }
         .input-field::placeholder {
             color: var(--text-secondary);
@@ -81,6 +78,13 @@
         }
         .button-primary:hover {
             background-color: var(--button-primary-hover-bg);
+        }
+        .button-google {
+            background-color: var(--google-button-bg);
+            color: white;
+        }
+        .button-google:hover {
+            background-color: var(--google-button-hover-bg);
         }
         .task-item {
             background-color: var(--task-item-bg);
@@ -139,78 +143,175 @@
         .button-cancel:hover {
             background-color: var(--button-cancel-hover-bg);
         }
-        .theme-selector-wrapper .theme-selector { /* Targeting the select within the wrapper */
-            background-color: var(--task-item-bg); /* Use secondary bg for selector */
+        .theme-selector-wrapper .theme-selector {
+            background-color: var(--task-item-bg);
             color: var(--text-primary);
         }
         .theme-selector-wrapper .theme-selector:focus {
              outline: none;
             box-shadow: 0 0 0 2px var(--input-focus-ring);
         }
-         /* To center the title when theme selector is present */
         .header-content {
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: space-between; /* Pushes items to ends */
-            width: 100%; /* Ensure it takes full width */
-            margin-bottom: 1.5rem; /* Equivalent to mb-6 */
+            width: 100%;
+            margin-bottom: 1.5rem;
+            position: relative;
         }
         .header-content h1 {
-            flex-grow: 1; /* Allow title to take available space */
-            text-align: center; /* Center the text within its flex item */
-            margin-left: auto; /* Push title to center from left */
-            margin-right: auto; /* Push title to center from right */
-            max-width: fit-content; /* Prevent it from taking too much space */
+            text-align: center;
+            max-width: fit-content;
+            margin-left: 0;
+            margin-right: 0;
+        }
+        .header-content > .flex.items-center.justify-between.w-full {
+            margin-top: 0.5rem;
         }
 
+        .auth-error {
+            color: var(--error-text-color);
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+        }
+        .user-info {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            background-color: var(--secondary-bg);
+            border-radius: var(--border-radius-elements);
+            box-shadow: var(--shadow-item);
+            margin-bottom: 1rem;
+        }
+        .user-info button {
+            background-color: var(--button-cancel-bg);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 0.5rem;
+            transition: background-color 0.3s ease;
+        }
+        .user-info button:hover {
+            background-color: var(--button-cancel-hover-bg);
+        }
+        .button-google img {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-6">
 
     <div class="w-full max-w-lg main-container rounded-2xl shadow-xl p-8 transform transition-all duration-300 hover:scale-105 relative">
-        <div class="header-content">
-            <h1 class="text-4xl font-extrabold header-text tracking-tight">Tasktify</h1>
-            <div class="flex items-center gap-2 theme-selector-wrapper">
-                <label for="theme-selector" class="text-sm theme-selector-label" style="color: var(--text-primary);">Theme:</label>
-                <select id="theme-selector" class="p-2 rounded-md theme-selector focus:ring-2 focus:ring-indigo-400">
-                    <option value="default">Default (Light)</option>
-                    <option value="dark">Dark Mode</option>
-                    <option value="ocean">Ocean Blue</option>
-                    <option value="forest">Forest Green</option>
-                </select>
+        <div class="header-content flex flex-col items-center mb-6 relative">
+            <div id="user-display" class="user-info w-full flex justify-between items-center mb-4 hidden">
+                <span id="user-email" class="text-sm font-medium"></span>
+                <button id="logout-button" class="px-3 py-1 text-xs rounded-md transition button-cancel hover:button-cancel-hover">Logout</button>
+            </div>
+            
+            <div class="flex items-center justify-between w-full">
+                <h1 class="text-4xl font-extrabold header-text tracking-tight flex-grow text-center">Tasktify</h1>
+                <div class="flex items-center gap-2 theme-selector-wrapper">
+                    <label for="theme-selector" class="text-sm theme-selector-label" style="color: var(--text-primary);">Theme:</label>
+                    <select id="theme-selector" class="p-2 rounded-md theme-selector focus:ring-2 focus:ring-indigo-400">
+                        <option value="default">Default (Light)</option>
+                        <option value="dark">Dark Mode</option>
+                        <option value="ocean">Ocean Blue</option>
+                        <option value="forest">Forest Green</option>
+                    </select>
+                </div>
             </div>
         </div>
-        <form class="new-task-form flex gap-3 mb-6">
-            <input
-                type="text"
-                required
-                class="new-task flex-1 px-5 py-3 border rounded-xl text-lg placeholder-gray-400 input-field"
-                placeholder="What's your next task?" />
-            <button
-                type="submit"
-                class="button-primary px-6 py-3 rounded-xl hover:bg-indigo-700 transition duration-300 ease-in-out shadow-lg text-lg">
-                Add Task
-            </button>
-        </form>
+        <div id="auth-section" class="mb-6">
+            <h2 class="text-2xl font-semibold mb-4 text-center header-text">Welcome!</h2>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label for="login-email" class="block text-sm font-medium" style="color: var(--text-primary);">Email</label>
+                    <input type="email" id="login-email" required class="input-field mt-1 block w-full px-4 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="login-password" class="block text-sm font-medium" style="color: var(--text-primary);">Password</label>
+                    <input type="password" id="login-password" required class="input-field mt-1 block w-full px-4 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <button type="submit" class="button-primary w-full px-4 py-2 rounded-md transition duration-300 ease-in-out">
+                    Login
+                </button>
+                <p id="login-error" class="auth-error text-center"></p>
+                <p class="text-center my-4" style="color: var(--text-secondary);">OR</p>
+                <button type="button" id="google-login-button" class="button-google w-full px-4 py-2 rounded-md transition duration-300 ease-in-out flex items-center justify-center">
+                    <img src="https://img.icons8.com/color/48/000000/google-logo.png" alt="Google Logo" />
+                    Login with Google
+                </button>
+                <p class="text-center text-sm mt-4" style="color: var(--text-secondary);">
+                    Don't have an account? <a href="#" id="show-signup" class="text-indigo-600 hover:text-indigo-800 font-medium">Sign Up</a>
+                </p>
+            </form>
 
-        <ol id="Task" class="space-y-4"></ol>
+            <form id="signup-form" class="space-y-4 hidden">
+                <div>
+                    <label for="signup-email" class="block text-sm font-medium" style="color: var(--text-primary);">Email</label>
+                    <input type="email" id="signup-email" required class="input-field mt-1 block w-full px-4 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="signup-password" class="block text-sm font-medium" style="color: var(--text-primary);">Password</label>
+                    <input type="password" id="signup-password" required class="input-field mt-1 block w-full px-4 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <button type="submit" class="button-primary w-full px-4 py-2 rounded-md transition duration-300 ease-in-out">
+                    Sign Up
+                </button>
+                <p id="signup-error" class="auth-error text-center"></p>
+                <p class="text-center my-4" style="color: var(--text-secondary);">OR</p>
+                 <button type="button" id="google-signup-button" class="button-google w-full px-4 py-2 rounded-md transition duration-300 ease-in-out flex items-center justify-center">
+                    <img src="https://img.icons8.com/color/48/000000/google-logo.png" alt="Google Logo" />
+                    Sign Up with Google
+                </button>
+                <p class="text-center text-sm mt-4" style="color: var(--text-secondary);">
+                    Already have an account? <a href="#" id="show-login" class="text-indigo-600 hover:text-indigo-800 font-medium">Login</a>
+                </p>
+            </form>
+        </div>
+
+        <div id="task-section" class="hidden">
+            <form class="new-task-form flex gap-3 mb-6">
+                <input
+                    type="text"
+                    required
+                    class="new-task flex-1 px-5 py-3 border rounded-xl text-lg placeholder-gray-400 input-field"
+                    placeholder="What's your next task?" />
+                <button
+                    type="submit"
+                    class="button-primary px-6 py-3 rounded-xl hover:bg-indigo-700 transition duration-300 ease-in-out shadow-lg text-lg">
+                    Add Task
+                </button>
+            </form>
+            <ol id="Task" class="space-y-4"></ol>
+        </div>
     </div>
 
     <script>
         $(document).ready(function () {
             // Firebase Configuration
+            // IMPORTANT: Replace with your actual Firebase project configuration!
             const firebaseConfig = {
-                apiKey: "AIzaSyDONsCD2ylgOMLz2gmZ0dEz2C4IdeF0wKA",
-                authDomain: "tasktify-1cb16.firebaseapp.com",
-                projectId: "tasktify-1cb16",
-                storageBucket: "tasktify-1cb16.appspot.com",
-                messagingSenderId: "759089908374",
-                appId: "1:759089908374:web:cf8a405e6ceb129b6090b7",
-                measurementId: "G-50NJYVKLB7"
+                apiKey: "AIzaSyDONsCD2ylgOMLz2gmZ0dEz2C4IdeF0wKA", // REPLACE THIS LINE WITH YOUR ACTUAL API KEY
+                authDomain: "tasktify-1cb16.firebaseapp.com", // REPLACE THIS LINE WITH YOUR ACTUAL AUTH DOMAIN
+                projectId: "tasktify-1cb16", // REPLACE THIS LINE WITH YOUR ACTUAL PROJECT ID
+                storageBucket: "tasktify-1cb16.appspot.com", // REPLACE THIS LINE WITH YOUR ACTUAL STORAGE BUCKET
+                messagingSenderId: "759089908374", // REPLACE THIS LINE WITH YOUR ACTUAL MESSAGING SENDER ID
+                appId: "1:759089908374:web:cf8a405e6ceb129b6090b7", // REPLACE THIS LINE WITH YOUR ACTUAL APP ID
+                measurementId: "G-50NJYVKLB7" // REPLACE THIS LINE WITH YOUR ACTUAL MEASUREMENT ID (OR REMOVE IF NOT APPLICABLE)
             };
 
             firebase.initializeApp(firebaseConfig);
             const db = firebase.firestore();
+            const auth = firebase.auth();
+            const googleProvider = new firebase.auth.GoogleAuthProvider(); // Initialize Google Auth Provider
+
+            let currentUser = null; // To store the current authenticated user
 
             // --- Theme Switching Logic ---
             const themeSelector = $('#theme-selector');
@@ -243,6 +344,9 @@
                     '--button-save-hover-bg': '#1d4ed8',
                     '--button-cancel-bg': '#9ca3af',
                     '--button-cancel-hover-bg': '#6b7280',
+                    '--error-text-color': '#ef4444',
+                    '--google-button-bg': '#db4437',
+                    '--google-button-hover-bg': '#c13122',
                 },
                 'dark': {
                     '--primary-bg': '#1a202c', /* charcoal */
@@ -270,6 +374,9 @@
                     '--button-save-hover-bg': '#2b6cb0',
                     '--button-cancel-bg': '#4a5568',
                     '--button-cancel-hover-bg': '#2d3748',
+                    '--error-text-color': '#fc8181', /* Lighter red for dark mode */
+                    '--google-button-bg': '#db4437',
+                    '--google-button-hover-bg': '#c13122',
                 },
                 'ocean': {
                     '--primary-bg': 'linear-gradient(to right, #6366f1, #3b82f6)', /* indigo-500 to blue-500 */
@@ -297,6 +404,9 @@
                     '--button-save-hover-bg': '#1d4ed8',
                     '--button-cancel-bg': '#93c5fd',
                     '--button-cancel-hover-bg': '#60a5fa',
+                    '--error-text-color': '#e0f2fe',
+                    '--google-button-bg': '#db4437',
+                    '--google-button-hover-bg': '#c13122',
                 },
                 'forest': {
                     '--primary-bg': 'linear-gradient(to right, #10b981, #059669)', /* emerald-500 to green-600 */
@@ -324,6 +434,9 @@
                     '--button-save-hover-bg': '#047857',
                     '--button-cancel-bg': '#a7f3d0',
                     '--button-cancel-hover-bg': '#6ee7b7',
+                    '--error-text-color': '#f87171',
+                    '--google-button-bg': '#db4437',
+                    '--google-button-hover-bg': '#c13122',
                 }
             };
 
@@ -352,11 +465,182 @@
 
             // --- End Theme Switching Logic ---
 
+            // --- Auth Logic ---
+            const authSection = $('#auth-section');
+            const taskSection = $('#task-section');
+            const loginForm = $('#login-form');
+            const signupForm = $('#signup-form');
+            const loginError = $('#login-error');
+            const signupError = $('#signup-error');
+            const showSignup = $('#show-signup');
+            const showLogin = $('#show-login');
+            const userDisplay = $('#user-display');
+            const userEmailSpan = $('#user-email');
+            const logoutButton = $('#logout-button');
+            const googleLoginButton = $('#google-login-button'); // New Google button
+            const googleSignupButton = $('#google-signup-button'); // New Google button
+
+            // Toggle between login and signup forms
+            showSignup.on('click', function(e) {
+                e.preventDefault();
+                loginForm.hide();
+                signupForm.show();
+                loginError.text('');
+                signupError.text('');
+            });
+
+            showLogin.on('click', function(e) {
+                e.preventDefault();
+                signupForm.hide();
+                loginForm.show();
+                loginError.text('');
+                signupError.text('');
+            });
+
+            // Login Handler (Email/Password)
+            loginForm.on('submit', function(e) {
+                e.preventDefault();
+                const email = $('#login-email').val();
+                const password = $('#login-password').val();
+                loginError.text('');
+
+                auth.signInWithEmailAndPassword(email, password)
+                    .then((userCredential) => {
+                        // Signed in - handled by onAuthStateChanged listener
+                    })
+                    .catch((error) => {
+                        const errorMessage = error.message;
+                        loginError.text(errorMessage);
+                    });
+            });
+
+            // Signup Handler (Email/Password)
+            signupForm.on('submit', function(e) {
+                e.preventDefault();
+                const email = $('#signup-email').val();
+                const password = $('#signup-password').val();
+                signupError.text('');
+
+                auth.createUserWithEmailAndPassword(email, password)
+                    .then((userCredential) => {
+                        // Signed up - handled by onAuthStateChanged listener
+                    })
+                    .catch((error) => {
+                        const errorMessage = error.message;
+                        signupError.text(errorMessage);
+                    });
+            });
+
+            // Google Sign-In Handler
+            function handleGoogleSignIn() {
+                auth.signInWithPopup(googleProvider)
+                    .then((result) => {
+                        // Handled by onAuthStateChanged listener
+                    }).catch((error) => {
+                        const errorMessage = error.message;
+                        if (loginForm.is(':visible')) {
+                            loginError.text(`Google Sign-in Error: ${errorMessage}`);
+                        } else if (signupForm.is(':visible')) {
+                            signupError.text(`Google Sign-up Error: ${errorMessage}`);
+                        }
+                        console.error("Google Sign-in Error:", error);
+                    });
+            }
+
+            googleLoginButton.on('click', handleGoogleSignIn);
+            googleSignupButton.on('click', handleGoogleSignIn);
+
+            // Logout Handler
+            logoutButton.on('click', function() {
+                auth.signOut().then(() => {
+                    // Signed out - handled by onAuthStateChanged listener
+                }).catch((error) => {
+                    console.error("Logout Error:", error);
+                });
+            });
+
+            // Firebase Auth State Listener
+            auth.onAuthStateChanged((user) => {
+                currentUser = user; // Update the global currentUser variable
+                if (user) {
+                    // User is logged in
+                    authSection.hide();
+                    taskSection.show();
+                    userDisplay.removeClass('hidden');
+                    userEmailSpan.text(user.email);
+                    $("#Task").empty(); // Clear previous tasks on login
+                    setupRealtimeListener(user.uid); // Setup listener for this user's tasks
+                } else {
+                    // User is logged out
+                    authSection.show();
+                    taskSection.hide();
+                    userDisplay.addClass('hidden');
+                    userEmailSpan.text('');
+                    $("#Task").empty(); // Clear tasks on logout
+                    if (taskListener) { // Unsubscribe if a listener exists
+                        taskListener();
+                        taskListener = null;
+                    }
+                    // Show login form by default on logout
+                    loginForm.show();
+                    signupForm.hide();
+                    loginError.text('');
+                    signupError.text('');
+                }
+            });
+
+            // --- End Auth Logic ---
+
+            // --- Firestore Task Logic (Modified for User Specificity) ---
+            let taskListener = null; // To store the Firestore listener unsubscribe function
+
+            function setupRealtimeListener(uid) {
+                // If a listener already exists, unsubscribe it first
+                if (taskListener) {
+                    taskListener();
+                }
+
+                // Setup new listener for the current user's tasks
+                // This is the query that filters by userId and orders by timestamp
+                taskListener = db.collection("Task")
+                    .where("userId", "==", uid) // Filter by current user's ID
+                    .orderBy("timestamp", "desc") // Order by timestamp
+                    .onSnapshot((snapshot) => {
+                        snapshot.docChanges().forEach((change) => {
+                            const data = change.doc.data();
+                            const id = change.doc.id;
+                            const html = renderTask(id, data.todo, data.done, data.timestamp);
+
+                            if (change.type === "added") {
+                                $("#Task").prepend(html); // Prepend to show newest first
+                            }
+                            if (change.type === "modified") {
+                                $(`li[data-key='${id}']`).replaceWith(html);
+                            }
+                            if (change.type === "removed") {
+                                $(`li[data-key='${id}']`).remove();
+                            }
+                        });
+                    }, (error) => {
+                        console.error("Error listening to tasks:", error);
+                        // Provide more specific feedback if an error occurs
+                        if (error.code === "permission-denied") {
+                            alert("You do not have permission to view these tasks. Please ensure you are logged in and your Firestore rules are correct.");
+                        } else if (error.code === "failed-precondition" && error.message.includes("The query requires an index")) {
+                            // This specific check might not always catch it if the error message changes slightly
+                            alert("Firestore Indexing Error: A required database index is missing or still building. Please check the Firebase console > Firestore Database > Indexes tab for the 'Task' collection on 'userId' and 'timestamp'.");
+                        }
+                        else {
+                            alert("An unexpected error occurred while fetching tasks: " + error.message);
+                        }
+                    });
+            }
+
             // Function to render a task
             function renderTask(id, todo, done, timestamp) {
                 const date = timestamp ? new Date(timestamp.toDate()).toLocaleString() : 'No date';
                 const taskHTML = `
-                    <li data-key="${id}" class="task-item flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 py-4 transition-all duration-200 ease-in-out hover:shadow-lg">
+                    <li data-key="${id}" class="task-item flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 py-4 border border-gray-200 rounded-xl transition-all duration-200 ease-in-out hover:shadow-lg">
                         <div class="flex-1 mb-2 sm:mb-0 mr-0 sm:mr-4">
                             <span class="task-text ${done ? 'line-through' : 'font-semibold text-lg'}">${todo}</span>
                             <p class="text-sm mt-1 timestamp-text">Created: ${date}</p>
@@ -373,49 +657,48 @@
                 return taskHTML;
             }
 
-            // Realtime listener for tasks
-            db.collection("Task").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
-                snapshot.docChanges().forEach((change) => {
-                    const data = change.doc.data();
-                    const id = change.doc.id;
-                    const html = renderTask(id, data.todo, data.done, data.timestamp);
-
-                    if (change.type === "added") {
-                        $("#Task").prepend(html); // Prepend to show newest first
-                    }
-                    if (change.type === "modified") {
-                        $(`li[data-key='${id}']`).replaceWith(html);
-                    }
-                    if (change.type === "removed") {
-                        $(`li[data-key='${id}']`).remove();
-                    }
-                });
-            });
-
             // Add new task
             $(".new-task-form").submit(function (e) {
                 e.preventDefault();
                 const newTask = $(".new-task").val().trim();
-                if (newTask) {
+                if (newTask && currentUser) { // Ensure user is logged in
                     db.collection("Task").add({
                         todo: newTask,
                         done: false,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp() // Add timestamp
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        userId: currentUser.uid // Store the user ID with the task
+                    }).then(() => {
+                        console.log("Task added successfully!");
+                        $(".new-task").val(""); // Clear input on success
+                    }).catch((error) => {
+                        console.error("Error adding task: ", error);
+                        alert("Failed to add task: " + error.message);
                     });
-                    $(".new-task").val(""); // Clear input
+                } else if (!currentUser) {
+                    alert("Please log in to add tasks.");
                 }
             });
 
             // Mark task as done
             $(document).on('click', '.done-task', function () {
                 const id = $(this).attr("doc-id");
-                db.collection("Task").doc(id).update({ done: true });
+                if (currentUser) {
+                    db.collection("Task").doc(id).update({ done: true }).catch(error => {
+                        console.error("Error marking task done: ", error);
+                        alert("Failed to update task: " + error.message);
+                    });
+                }
             });
 
             // Mark task as undone
             $(document).on('click', '.undone-task', function () {
                 const id = $(this).attr("doc-id");
-                db.collection("Task").doc(id).update({ done: false });
+                if (currentUser) {
+                    db.collection("Task").doc(id).update({ done: false }).catch(error => {
+                        console.error("Error marking task undone: ", error);
+                        alert("Failed to update task: " + error.message);
+                    });
+                }
             });
 
             // Edit task
@@ -424,10 +707,6 @@
                 const id = listItem.data('key');
                 const currentTextElement = listItem.find('.task-text');
                 const currentText = currentTextElement.text();
-
-                // Store current task data in the DOM (e.g., using .data()) before replacing
-                listItem.data('original-todo', currentText);
-                listItem.data('original-done', currentTextElement.hasClass('line-through'));
 
                 // Replace text with input field, apply input-field classes
                 currentTextElement.replaceWith(`
@@ -447,11 +726,13 @@
                 const id = $(this).attr("doc-id");
                 const newText = listItem.find('.edit-input').val().trim();
 
-                if (newText) {
-                    db.collection("Task").doc(id).update({ todo: newText });
+                if (newText && currentUser) {
+                    db.collection("Task").doc(id).update({ todo: newText }).catch(error => {
+                        console.error("Error saving task edit: ", error);
+                        alert("Failed to save task: " + error.message);
+                    });
                 }
                 // The Firestore snapshot listener will handle re-rendering once the update is successful.
-                // If newText is empty, the listener will still trigger with original value, so no need for explicit revert here.
             });
 
             // Cancel edit
@@ -459,33 +740,30 @@
                 const listItem = $(this).closest('.task-item');
                 const id = $(this).attr("doc-id");
 
-                // Retrieve the current data from Firestore to ensure it's up-to-date,
-                // or use the data stored in the DOM if available (less reliable if another user changed it).
-                try {
-                    const doc = await db.collection("Task").doc(id).get();
-                    if (doc.exists) {
-                        const data = doc.data();
-                        const html = renderTask(id, data.todo, data.done, data.timestamp);
-                        listItem.replaceWith(html); // Revert the UI to original state
-                    }
-                } catch (error) {
-                    console.error("Error fetching document to cancel edit:", error);
-                    // Fallback: If Firestore fetch fails, try to use the locally stored original data
-                    const originalTodo = listItem.data('original-todo');
-                    const originalDone = listItem.data('original-done');
-                    // Note: Timestamp won't be available from data() here easily, but the task content will revert.
-                    if (originalTodo !== undefined && originalDone !== undefined) {
-                         const tempHtml = renderTask(id, originalTodo, originalDone, null); // Pass null for timestamp if not easily available
-                         listItem.replaceWith(tempHtml);
+                if (currentUser) {
+                    try {
+                        const doc = await db.collection("Task").doc(id).get();
+                        if (doc.exists) {
+                            const data = doc.data();
+                            const html = renderTask(id, data.todo, data.done, data.timestamp);
+                            listItem.replaceWith(html); // Revert the UI to original state
+                        }
+                    } catch (error) {
+                        console.error("Error fetching document to cancel edit:", error);
+                        alert("Could not revert task due to an error: " + error.message);
                     }
                 }
             });
 
-
             // Delete task
             $(document).on('click', '.delete-task', function () {
                 const id = $(this).attr("doc-id");
-                db.collection("Task").doc(id).delete();
+                if (currentUser) {
+                    db.collection("Task").doc(id).delete().catch(error => {
+                        console.error("Error deleting task: ", error);
+                        alert("Failed to delete task: " + error.message);
+                    });
+                }
             });
         });
     </script>
