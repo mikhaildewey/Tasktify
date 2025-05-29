@@ -10,6 +10,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="manifest" href="manifest.json">
     <style>
         body {
             font-family: var(--font-family);
@@ -56,6 +57,7 @@
             border-radius: var(--border-radius-main);
             box-shadow: var(--shadow-main);
             color: var(--text-primary);
+            transition: background-color 0.5s ease, border-radius 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease; /* Ensure transition for hover */
         }
         .header-text {
             color: var(--header-text);
@@ -202,6 +204,17 @@
             height: 20px;
             margin-right: 8px;
         }
+
+        /* NEW CSS FOR SMOOTH TRANSITIONS */
+        .fade-section {
+            opacity: 0;
+            transform: scale(0.95) translateY(10px); /* Slightly scale down and move up initially */
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out; /* Longer, smoother transition */
+        }
+        .fade-section.active {
+            opacity: 1;
+            transform: scale(1) translateY(0); /* Return to original size and position */
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-6">
@@ -226,7 +239,8 @@
                 </div>
             </div>
         </div>
-        <div id="auth-section" class="mb-6">
+
+        <div id="auth-section" class="mb-6 fade-section active">
             <h2 class="text-2xl font-semibold mb-4 text-center header-text">Welcome!</h2>
             <form id="login-form" class="space-y-4">
                 <div>
@@ -275,7 +289,7 @@
             </form>
         </div>
 
-        <div id="task-section" class="hidden">
+        <div id="task-section" class="hidden fade-section">
             <form class="new-task-form flex gap-3 mb-6">
                 <input
                     type="text"
@@ -465,7 +479,7 @@
 
             // --- End Theme Switching Logic ---
 
-            // --- Auth Logic ---
+            // --- Auth Logic (MODIFIED FOR SMOOTH TRANSITIONS) ---
             const authSection = $('#auth-section');
             const taskSection = $('#task-section');
             const loginForm = $('#login-form');
@@ -477,10 +491,29 @@
             const userDisplay = $('#user-display');
             const userEmailSpan = $('#user-email');
             const logoutButton = $('#logout-button');
-            const googleLoginButton = $('#google-login-button'); // New Google button
-            const googleSignupButton = $('#google-signup-button'); // New Google button
+            const googleLoginButton = $('#google-login-button');
+            const googleSignupButton = $('#google-signup-button');
 
-            // Toggle between login and signup forms
+            // Function to transition between sections
+            function transitionToSection(showSection, hideSection) {
+                // Hide current section visually
+                hideSection.removeClass('active');
+                
+                // Wait for the fade-out transition to complete (0.6s CSS transition)
+                setTimeout(() => {
+                    hideSection.addClass('hidden'); // Fully hide with display: none
+                    showSection.removeClass('hidden'); // Make the target section visible (display: block)
+
+                    // A small delay is crucial here. Without it, the browser might
+                    // not register the `display: block` change before `active` is added,
+                    // causing the fade-in animation not to trigger.
+                    setTimeout(() => {
+                        showSection.addClass('active'); // Start the fade-in transition
+                    }, 50); // Small delay
+                }, 600); // This delay should match your CSS transition duration (0.6s = 600ms)
+            }
+
+            // Toggle between login and signup forms (within auth-section)
             showSignup.on('click', function(e) {
                 e.preventDefault();
                 loginForm.hide();
@@ -559,21 +592,22 @@
                 });
             });
 
-            // Firebase Auth State Listener
+            // Firebase Auth State Listener (MODIFIED)
             auth.onAuthStateChanged((user) => {
                 currentUser = user; // Update the global currentUser variable
                 if (user) {
                     // User is logged in
-                    authSection.hide();
-                    taskSection.show();
-                    userDisplay.removeClass('hidden');
                     userEmailSpan.text(user.email);
+                    userDisplay.removeClass('hidden'); // User info should be visible instantly
+
                     $("#Task").empty(); // Clear previous tasks on login
                     setupRealtimeListener(user.uid); // Setup listener for this user's tasks
+
+                    // Trigger the transition from auth-section to task-section
+                    transitionToSection(taskSection, authSection);
+
                 } else {
                     // User is logged out
-                    authSection.show();
-                    taskSection.hide();
                     userDisplay.addClass('hidden');
                     userEmailSpan.text('');
                     $("#Task").empty(); // Clear tasks on logout
@@ -582,10 +616,13 @@
                         taskListener = null;
                     }
                     // Show login form by default on logout
-                    loginForm.show();
+                    loginForm.show(); // Ensure login form is shown within auth section
                     signupForm.hide();
                     loginError.text('');
                     signupError.text('');
+
+                    // Trigger the transition from task-section back to auth-section
+                    transitionToSection(authSection, taskSection);
                 }
             });
 
@@ -625,144 +662,133 @@
                         console.error("Error listening to tasks:", error);
                         // Provide more specific feedback if an error occurs
                         if (error.code === "permission-denied") {
-                            alert("You do not have permission to view these tasks. Please ensure you are logged in and your Firestore rules are correct.");
-                        } else if (error.code === "failed-precondition" && error.message.includes("The query requires an index")) {
-                            // This specific check might not always catch it if the error message changes slightly
-                            alert("Firestore Indexing Error: A required database index is missing or still building. Please check the Firebase console > Firestore Database > Indexes tab for the 'Task' collection on 'userId' and 'timestamp'.");
-                        }
-                        else {
-                            alert("An unexpected error occurred while fetching tasks: " + error.message);
+                            alert("You do not have permission to view these tasks. Please ensure you are logged in and your Firebase security rules are correctly configured.");
+                        } else {
+                            alert("An error occurred while fetching tasks: " + error.message);
                         }
                     });
             }
 
-            // Function to render a task
+            // Function to render a single task item HTML
             function renderTask(id, todo, done, timestamp) {
-                const date = timestamp ? new Date(timestamp.toDate()).toLocaleString() : 'No date';
-                const taskHTML = `
-                    <li data-key="${id}" class="task-item flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 py-4 border border-gray-200 rounded-xl transition-all duration-200 ease-in-out hover:shadow-lg">
-                        <div class="flex-1 mb-2 sm:mb-0 mr-0 sm:mr-4">
-                            <span class="task-text ${done ? 'line-through' : 'font-semibold text-lg'}">${todo}</span>
-                            <p class="text-sm mt-1 timestamp-text">Created: ${date}</p>
+                const timestampDate = timestamp ? timestamp.toDate() : new Date(); // Convert Firebase Timestamp to Date object
+                const formattedTime = timestampDate.toLocaleString(); // Format to readable string
+
+                const taskDoneClass = done ? 'line-through' : '';
+                const buttonText = done ? 'Undone' : 'Done';
+                const buttonClass = done ? 'button-undone hover:button-undone-hover' : 'button-done hover:button-done-hover';
+
+                return `
+                    <li data-key="${id}" class="task-item flex items-center justify-between p-4 border-b last:border-b-0 transition duration-300 ease-in-out transform hover:scale-[1.02] shadow-sm">
+                        <div class="flex-1 flex flex-col">
+                            <span class="task-text text-lg font-medium ${taskDoneClass}">${todo}</span>
+                            <span class="timestamp-text text-xs mt-1">Added: ${formattedTime}</span>
                         </div>
-                        <div class="flex flex-wrap gap-2 justify-end">
-                            ${done ?
-                                `<button doc-id="${id}" class="undone-task px-4 py-2 rounded-lg transition text-sm button-undone">Undone</button>` :
-                                `<button doc-id="${id}" class="done-task px-4 py-2 rounded-lg transition text-sm button-done">Done</button>`
-                            }
-                            <button doc-id="${id}" class="edit-task px-4 py-2 rounded-lg transition text-sm button-edit">Edit</button>
-                            <button doc-id="${id}" class="delete-task px-4 py-2 rounded-lg transition text-sm button-delete">Delete</button>
+                        <div class="task-actions flex items-center space-x-2">
+                            <button class="toggle-done-btn px-3 py-1 rounded-md text-sm font-semibold transition ${buttonClass}">${buttonText}</button>
+                            <button class="edit-btn button-edit hover:button-edit-hover px-3 py-1 rounded-md text-sm font-semibold transition">Edit</button>
+                            <button class="delete-btn button-delete hover:button-delete-hover px-3 py-1 rounded-md text-sm font-semibold transition">Delete</button>
                         </div>
-                    </li>`;
-                return taskHTML;
+                        <div class="edit-mode hidden flex-1 flex gap-2">
+                            <input type="text" value="${todo}" class="edit-task-input flex-1 px-3 py-1 border rounded-md input-field">
+                            <button class="save-edit-btn button-save hover:button-save-hover px-3 py-1 rounded-md text-sm font-semibold">Save</button>
+                            <button class="cancel-edit-btn button-cancel hover:button-cancel-hover px-3 py-1 rounded-md text-sm font-semibold">Cancel</button>
+                        </div>
+                    </li>
+                `;
             }
 
-            // Add new task
-            $(".new-task-form").submit(function (e) {
+            // Add Task
+            $('.new-task-form').on('submit', function (e) {
                 e.preventDefault();
-                const newTask = $(".new-task").val().trim();
-                if (newTask && currentUser) { // Ensure user is logged in
+                if (!currentUser) {
+                    alert('Please log in to add tasks.');
+                    return;
+                }
+                const taskInput = $('.new-task');
+                const taskText = taskInput.val().trim();
+                if (taskText) {
                     db.collection("Task").add({
-                        todo: newTask,
+                        todo: taskText,
                         done: false,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        userId: currentUser.uid // Store the user ID with the task
-                    }).then(() => {
-                        console.log("Task added successfully!");
-                        $(".new-task").val(""); // Clear input on success
-                    }).catch((error) => {
-                        console.error("Error adding task: ", error);
-                        alert("Failed to add task: " + error.message);
-                    });
-                } else if (!currentUser) {
-                    alert("Please log in to add tasks.");
-                }
-            });
-
-            // Mark task as done
-            $(document).on('click', '.done-task', function () {
-                const id = $(this).attr("doc-id");
-                if (currentUser) {
-                    db.collection("Task").doc(id).update({ done: true }).catch(error => {
-                        console.error("Error marking task done: ", error);
-                        alert("Failed to update task: " + error.message);
+                        userId: currentUser.uid, // Store the user's ID
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp() // Add server timestamp
+                    })
+                    .then(() => {
+                        taskInput.val(''); // Clear input
+                    })
+                    .catch((error) => {
+                        console.error("Error adding document: ", error);
+                        alert("Error adding task: " + error.message);
                     });
                 }
             });
 
-            // Mark task as undone
-            $(document).on('click', '.undone-task', function () {
-                const id = $(this).attr("doc-id");
-                if (currentUser) {
-                    db.collection("Task").doc(id).update({ done: false }).catch(error => {
-                        console.error("Error marking task undone: ", error);
-                        alert("Failed to update task: " + error.message);
-                    });
-                }
-            });
-
-            // Edit task
-            $(document).on('click', '.edit-task', function () {
-                const listItem = $(this).closest('.task-item');
+            // Toggle Task Done/Undone
+            $('#Task').on('click', '.toggle-done-btn', function () {
+                if (!currentUser) return;
+                const listItem = $(this).closest('li');
                 const id = listItem.data('key');
-                const currentTextElement = listItem.find('.task-text');
-                const currentText = currentTextElement.text();
+                const currentDoneStatus = listItem.find('.task-text').hasClass('line-through');
 
-                // Replace text with input field, apply input-field classes
-                currentTextElement.replaceWith(`
-                    <input type="text" class="edit-input flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 input-field" value="${currentText}" />
-                `);
-
-                // Change buttons to Save and Cancel, apply respective button classes
-                listItem.find('.flex-wrap').html(`
-                    <button doc-id="${id}" class="save-edit px-4 py-2 rounded-lg transition text-sm button-save">Save</button>
-                    <button doc-id="${id}" class="cancel-edit px-4 py-2 rounded-lg transition text-sm button-cancel">Cancel</button>
-                `);
+                db.collection("Task").doc(id).update({
+                    done: !currentDoneStatus
+                })
+                .catch((error) => {
+                    console.error("Error updating document: ", error);
+                    alert("Error updating task status: " + error.message);
+                });
             });
 
-            // Save edited task
-            $(document).on('click', '.save-edit', function () {
-                const listItem = $(this).closest('.task-item');
-                const id = $(this).attr("doc-id");
-                const newText = listItem.find('.edit-input').val().trim();
-
-                if (newText && currentUser) {
-                    db.collection("Task").doc(id).update({ todo: newText }).catch(error => {
-                        console.error("Error saving task edit: ", error);
-                        alert("Failed to save task: " + error.message);
-                    });
-                }
-                // The Firestore snapshot listener will handle re-rendering once the update is successful.
-            });
-
-            // Cancel edit
-            $(document).on('click', '.cancel-edit', async function () {
-                const listItem = $(this).closest('.task-item');
-                const id = $(this).attr("doc-id");
-
-                if (currentUser) {
-                    try {
-                        const doc = await db.collection("Task").doc(id).get();
-                        if (doc.exists) {
-                            const data = doc.data();
-                            const html = renderTask(id, data.todo, data.done, data.timestamp);
-                            listItem.replaceWith(html); // Revert the UI to original state
-                        }
-                    } catch (error) {
-                        console.error("Error fetching document to cancel edit:", error);
-                        alert("Could not revert task due to an error: " + error.message);
-                    }
+            // Delete Task
+            $('#Task').on('click', '.delete-btn', function () {
+                if (!currentUser) return;
+                const id = $(this).closest('li').data('key');
+                if (confirm('Are you sure you want to delete this task?')) {
+                    db.collection("Task").doc(id).delete()
+                        .catch((error) => {
+                            console.error("Error removing document: ", error);
+                            alert("Error deleting task: " + error.message);
+                        });
                 }
             });
 
-            // Delete task
-            $(document).on('click', '.delete-task', function () {
-                const id = $(this).attr("doc-id");
-                if (currentUser) {
-                    db.collection("Task").doc(id).delete().catch(error => {
-                        console.error("Error deleting task: ", error);
-                        alert("Failed to delete task: " + error.message);
+            // Edit Task (Show input field)
+            $('#Task').on('click', '.edit-btn', function() {
+                const listItem = $(this).closest('li');
+                listItem.find('.task-actions').addClass('hidden');
+                listItem.find('.flex-1').addClass('hidden'); // Hide task text and timestamp
+                listItem.find('.edit-mode').removeClass('hidden').css('display', 'flex'); // Show edit mode
+            });
+
+            // Cancel Edit
+            $('#Task').on('click', '.cancel-edit-btn', function() {
+                const listItem = $(this).closest('li');
+                listItem.find('.task-actions').removeClass('hidden');
+                listItem.find('.flex-1').removeClass('hidden'); // Show task text and timestamp
+                listItem.find('.edit-mode').addClass('hidden');
+            });
+
+            // Save Edit
+            $('#Task').on('click', '.save-edit-btn', function() {
+                if (!currentUser) return;
+                const listItem = $(this).closest('li');
+                const id = listItem.data('key');
+                const newText = listItem.find('.edit-task-input').val().trim();
+
+                if (newText) {
+                    db.collection("Task").doc(id).update({
+                        todo: newText
+                    })
+                    .then(() => {
+                        // UI will be updated by the realtime listener
+                    })
+                    .catch((error) => {
+                        console.error("Error updating document: ", error);
+                        alert("Error saving task: " + error.message);
                     });
+                } else {
+                    alert("Task cannot be empty!");
                 }
             });
         });
