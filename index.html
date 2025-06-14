@@ -653,6 +653,7 @@
                             const html = renderTask(id, data.todo, data.done, data.timestamp);
 
                             if (change.type === "added") {
+                                console.log("Firestore 'added' event received for task:", data.todo, "ID:", id); // ADDED LOG
                                 $("#Task").prepend(html); // Prepend to show newest first
                             }
                             if (change.type === "modified") {
@@ -676,7 +677,8 @@
 
             // Function to render a task item in the UI
             function renderTask(id, todo, done, timestamp) {
-                const formattedTime = new Date(timestamp.toDate()).toLocaleString();
+                // Handle cases where timestamp might be null/pending (e.g., immediately after adding with serverTimestamp())
+                const formattedTime = timestamp && timestamp.toDate ? new Date(timestamp.toDate()).toLocaleString() : 'Pending...';
                 const taskClass = done ? 'line-through' : '';
                 const buttonText = done ? 'Undone' : 'Done';
                 const buttonClass = done ? 'button-undone hover:button-undone-hover' : 'button-done hover:button-done-hover';
@@ -769,7 +771,7 @@
                 const editButton = $(this);
                 const toggleButton = listItem.find('.task-toggle-button');
                 const deleteButton = listItem.find('.task-delete-button');
-                const saveButton = listItem.find('.task-save-button'); // Correctly target save button
+                const saveButton = listItem.find('.task-save-button');
                 const cancelButton = listItem.find('.task-cancel-button');
 
                 // Hide text, show input
