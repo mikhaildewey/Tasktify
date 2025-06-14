@@ -769,7 +769,7 @@
                 const editButton = $(this);
                 const toggleButton = listItem.find('.task-toggle-button');
                 const deleteButton = listItem.find('.task-delete-button');
-                const saveButton = listItem.find('.task-save-button');
+                const saveButton = listItem.find('.task-save-button'); // Correctly target save button
                 const cancelButton = listItem.find('.task-cancel-button');
 
                 // Hide text, show input
@@ -806,6 +806,22 @@
                         })
                         .then(() => {
                             // UI update handled by onSnapshot listener
+                            // After saving, revert buttons to original state
+                            const taskTextSpan = listItem.find('.task-text');
+                            const editButton = listItem.find('.task-edit-button');
+                            const toggleButton = listItem.find('.task-toggle-button');
+                            const deleteButton = listItem.find('.task-delete-button');
+                            const saveButton = listItem.find('.task-save-button');
+                            const cancelButton = listItem.find('.task-cancel-button');
+
+                            taskTextSpan.removeClass('hidden');
+                            taskEditInput.addClass('hidden');
+                            
+                            editButton.removeClass('hidden');
+                            toggleButton.removeClass('hidden');
+                            deleteButton.removeClass('hidden');
+                            saveButton.addClass('hidden');
+                            cancelButton.addClass('hidden');
                         })
                         .catch((error) => {
                             console.error("Error updating document: ", error);
@@ -823,8 +839,8 @@
                 const editButton = listItem.find('.task-edit-button');
                 const toggleButton = listItem.find('.task-toggle-button');
                 const deleteButton = listItem.find('.task-delete-button');
-                const saveButton = $(this);
-                const cancelButton = listItem.find('.task-cancel-button');
+                const saveButton = listItem.find('.task-save-button'); // FIXED: Correctly target save button
+                const cancelButton = $(this); // Target the clicked cancel button itself
 
                 // Show text, hide input
                 taskTextSpan.removeClass('hidden');
@@ -834,8 +850,8 @@
                 editButton.removeClass('hidden');
                 toggleButton.removeClass('hidden');
                 deleteButton.removeClass('hidden');
-                saveButton.addClass('hidden');
-                cancelButton.addClass('hidden');
+                saveButton.addClass('hidden'); // Now this correctly hides the save button
+                cancelButton.addClass('hidden'); // This hides the cancel button
 
                 // Reset input value to original task text
                 taskEditInput.val(taskTextSpan.text());
